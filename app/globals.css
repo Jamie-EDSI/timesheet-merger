@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* ---- Design tokens -----------------------------------------------------
+   "Routing slip" theme: this tool takes case rows and routes them from
+   one file to another, like a paper case file moving between desks.
+   Palette is a cool slate/teal "office ledger" tone instead of the usual
+   warm-cream + terracotta combo, with a rubber-stamp accent for the
+   duplicate/match callouts.
+------------------------------------------------------------------------ */
+:root {
+  --paper: #E8F1FA;
+  --panel: #FFFFFF;
+  --ink: #1B2430;
+  --ink-soft: #57626B;
+  --line: #D7DCD6;
+  --teal: #2F6F62;
+  --teal-dark: #1F4E44;
+  --teal-tint: #E4EEEA;
+  --amber: #C97A2A;
+  --amber-tint: #FBEEDD;
+  --red-stamp: #B23A34;
+  --red-tint: #F8E7E5;
+
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-public-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-teal: var(--teal);
+  --color-teal-dark: var(--teal-dark);
+  --color-teal-tint: var(--teal-tint);
+  --color-amber: var(--amber);
+  --color-amber-tint: var(--amber-tint);
+  --color-red-stamp: var(--red-stamp);
+  --color-red-tint: var(--red-tint);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+/* Rubber-stamp signature element used on duplicate / routed rows */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(-3deg);
+  white-space: nowrap;
+}
+
