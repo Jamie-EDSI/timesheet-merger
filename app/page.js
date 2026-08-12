@@ -61,22 +61,59 @@ function FileDropCard({ title, hint, file, onFile, accept, optional }) {
   );
 }
 
+function sumHours(arr) {
+  return (arr || []).reduce((s, n) => s + (n || 0), 0);
+}
+
+/** Total hours across every pay period found for one grouped employee (see lib/groupEntries.js). */
+function totalHoursForEmployee(employee) {
+  let total = 0;
+  for (const period of employee.periods) {
+    total += sumHours(period.holidayByDay) + sumHours(period.ptoByDay);
+    for (const fund of period.bcwdbFunds) total += sumHours(fund.byDay);
+    for (const fund of period.nonBcwdbFunds) total += sumHours(fund.byDay);
+  }
+  return total;
+}
+
 export default function Home() {
   const [reportFile, setReportFile] = useState(null);
   const [ongoingFile, setOngoingFile] = useState(null);
 
-  const [status, setStatus] = useState("idle"); // idle | processing | done | error
+  // idle | parsing | reviewing | processing | done | error
+  const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [preMergeWarnings, setPreMergeWarnings] = useState([]); // parse + group warnings
   const [warnings, setWarnings] = useState([]);
   const [summary, setSummary] = useState([]);
   const [periodsFound, setPeriodsFound] = useState([]);
+  const [groupedEmployees, setGroupedEmployees] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [downloadName, setDownloadName] = useState("");
 
-  const canProcess = !!reportFile && status !== "processing";
+  const canFindEmployees = !!reportFile && status !== "parsing" && status !== "processing";
+  const canConfirmMerge = selectedIds.size > 0 && status !== "processing";
 
-  async function handleProcess() {
-    setStatus("processing");
+  function toggleEmployee(employeeId) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(employeeId)) next.delete(employeeId);
+      else next.add(employeeId);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(groupedEmployees.map((e) => e.employeeId)));
+  }
+
+  function selectNone() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleFindEmployees() {
+    setStatus("parsing");
     setErrorMsg("");
     setWarnings([]);
     setSummary([]);
@@ -84,15 +121,36 @@ export default function Home() {
 
     try {
       const { entries, warnings: parseWarnings } = await parseReportFile(reportFile);
-      const { groupedEmployees, warnings: groupWarnings, periods } = groupEntries(entries);
+      const { groupedEmployees: grouped, warnings: groupWarnings, periods } = groupEntries(entries);
       setPeriodsFound(periods);
+      setPreMergeWarnings([...parseWarnings, ...groupWarnings]);
 
-      if (groupedEmployees.length === 0) {
+      if (grouped.length === 0) {
         setWarnings([...parseWarnings, ...groupWarnings]);
         setStatus("error");
         setErrorMsg("No usable rows were found in the check report - nothing to merge.");
         return;
       }
+
+      setGroupedEmployees(grouped);
+      setSelectedIds(new Set(grouped.map((e) => e.employeeId)));
+      setStatus("reviewing");
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+      setErrorMsg(err?.message || "Something went wrong while reading the report.");
+    }
+  }
+
+  async function handleConfirmMerge() {
+    setStatus("processing");
+    setErrorMsg("");
+    setWarnings([]);
+    setSummary([]);
+    setDownloadUrl(null);
+
+    try {
+      const includedEmployees = groupedEmployees.filter((e) => selectedIds.has(e.employeeId));
 
       const templateArrayBuffer = await fetch("/template/Contractor_Timesheet_PY26.xlsx").then((r) =>
         r.arrayBuffer()
@@ -102,10 +160,10 @@ export default function Home() {
       const { blob, warnings: buildWarnings, summary: buildSummary } = await buildMergedWorkbook({
         templateArrayBuffer,
         ongoingArrayBuffer,
-        groupedEmployees,
+        groupedEmployees: includedEmployees,
       });
 
-      setWarnings([...parseWarnings, ...groupWarnings, ...buildWarnings]);
+      setWarnings([...preMergeWarnings, ...buildWarnings]);
       setSummary(buildSummary);
 
       const url = URL.createObjectURL(blob);
@@ -129,8 +187,8 @@ export default function Home() {
           <p className="mt-2 max-w-2xl text-ink-soft">
             Drop in a check report (PDF or Excel) and your ongoing Contractor Timesheet workbook. This
             tool matches each employee by ID, sorts their hours into the right fund columns, and gives
-            you back an updated workbook - one tab per employee - ready to save. Everything runs in
-            your browser; no file is ever uploaded anywhere.
+            you back an updated workbook - one tab per employee per pay period, ready to save.
+            Everything runs in your browser; no file is ever uploaded anywhere.
           </p>
         </header>
 
@@ -153,7 +211,7 @@ export default function Home() {
           </div>
           <FileDropCard
             title="Drop your ongoing Contractor Timesheet workbook here"
-            hint="Leave this blank the very first time - the app will start a brand-new workbook from the blank template, one tab per employee."
+            hint="Leave this blank the very first time - the app will start a brand-new workbook from the blank template, one tab per employee per pay period."
             file={ongoingFile}
             accept=".xlsx"
             onFile={setOngoingFile}
@@ -161,23 +219,14 @@ export default function Home() {
           />
 
           <div className="flex items-center gap-3 pt-2">
-            <StepBadge n={3} done={status === "done"} />
+            <StepBadge n={3} done={status === "reviewing" || status === "processing" || status === "done"} />
             <button
-              onClick={handleProcess}
-              disabled={!canProcess}
+              onClick={handleFindEmployees}
+              disabled={!canFindEmployees}
               className="rounded-md bg-teal px-5 py-2.5 font-display text-sm font-semibold text-white transition-colors hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {status === "processing" ? "Merging..." : "Merge into timesheet"}
+              {status === "parsing" ? "Reading report..." : "Find employees"}
             </button>
-            {downloadUrl && (
-              <a
-                href={downloadUrl}
-                download={downloadName}
-                className="rounded-md border-2 border-teal px-5 py-2.5 font-display text-sm font-semibold text-teal-dark transition-colors hover:bg-teal-tint"
-              >
-                Download {downloadName}
-              </a>
-            )}
           </div>
         </section>
 
@@ -194,6 +243,80 @@ export default function Home() {
           </div>
         )}
 
+        {groupedEmployees.length > 0 && (
+          <section className="mt-6 rounded-xl border border-line bg-panel p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-semibold text-ink">
+                Review employees ({selectedIds.size} of {groupedEmployees.length} selected)
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={selectAll}
+                  className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-teal hover:text-teal-dark"
+                >
+                  Select all
+                </button>
+                <button
+                  onClick={selectNone}
+                  className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-teal hover:text-teal-dark"
+                >
+                  Select none
+                </button>
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-ink-soft">
+              Unchecked employees are excluded from the merge. Uncheck anyone who shouldn't get a tab
+              this run.
+            </p>
+            <table className="mt-4 w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-ink-soft">
+                  <th className="w-8 pb-2"></th>
+                  <th className="pb-2 pr-4 font-medium">Employee</th>
+                  <th className="pb-2 pr-4 font-medium">ID</th>
+                  <th className="pb-2 font-medium">Total hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedEmployees.map((employee) => (
+                  <tr key={employee.employeeId} className="border-b border-line/60">
+                    <td className="py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(employee.employeeId)}
+                        onChange={() => toggleEmployee(employee.employeeId)}
+                        className="h-4 w-4"
+                      />
+                    </td>
+                    <td className="py-2 pr-4">{employee.employeeName}</td>
+                    <td className="py-2 pr-4 font-mono text-ink-soft">{employee.employeeId}</td>
+                    <td className="py-2">{totalHoursForEmployee(employee)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                onClick={handleConfirmMerge}
+                disabled={!canConfirmMerge}
+                className="rounded-md bg-teal px-5 py-2.5 font-display text-sm font-semibold text-white transition-colors hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {status === "processing" ? "Merging..." : "Merge into timesheet"}
+              </button>
+              {downloadUrl && (
+                <a
+                  href={downloadUrl}
+                  download={downloadName}
+                  className="rounded-md border-2 border-teal px-5 py-2.5 font-display text-sm font-semibold text-teal-dark transition-colors hover:bg-teal-tint"
+                >
+                  Download {downloadName}
+                </a>
+              )}
+            </div>
+          </section>
+        )}
+
         {summary.length > 0 && (
           <section className="mt-6 rounded-xl border border-line bg-panel p-6 shadow-sm">
             <h2 className="font-display text-lg font-semibold text-ink">What got written</h2>
@@ -207,8 +330,8 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {summary.map((row) => (
-                  <tr key={row.employeeId} className="border-b border-line/60">
+                {summary.map((row, i) => (
+                  <tr key={`${row.employeeId}-${i}`} className="border-b border-line/60">
                     <td className="py-2 pr-4">{row.employeeName}</td>
                     <td className="py-2 pr-4 font-mono text-ink-soft">{row.employeeId}</td>
                     <td className="py-2 pr-4">{row.sheetName}</td>

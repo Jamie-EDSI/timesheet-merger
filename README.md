@@ -2,7 +2,8 @@
 
 Drop in a check report (PDF or Excel) and your ongoing Contractor Timesheet
 workbook, and this tool merges the report's hours straight into the right
-tabs, days, and fund columns - matched by Employee ID, one tab per person.
+tabs, days, and fund columns - matched by Employee ID, one tab per employee
+per pay period.
 
 Everything runs **in your browser** - no backend, no login, nothing ever
 uploaded anywhere. That's on purpose, and it's the same approach the
@@ -18,11 +19,15 @@ OSY/ISY Case Router this project is based on uses.
 2. The app reads every daily hours row out of the report, figures out which
    2-week pay period each date falls into, and works out which fund each
    Project Code maps to (see below).
-3. For each employee, it finds (or creates) their tab, and writes their
-   hours into the right day/fund cells - reusing the *exact* template
-   formatting, colors, and dropdown lists, not a re-built approximation.
-4. You get a single workbook back, with one tab per employee, ready to
-   save as your new "ongoing" file for next time.
+3. You get a review list of every employee found (name, ID, total hours) so
+   you can uncheck anyone who shouldn't be included this run, then confirm.
+4. For each included employee and pay period, it creates a fresh tab and
+   writes their hours into the right day/fund cells - reusing the *exact*
+   template formatting, colors, and dropdown lists, not a re-built
+   approximation - and fills in the manager field with their most frequent
+   approver for that period.
+5. You get a single workbook back, with one tab per employee per pay
+   period, ready to save as your new "ongoing" file for next time.
 
 Run it again next pay period with the workbook you just downloaded as the
 "ongoing" file, and it picks up right where it left off - it won't
@@ -61,11 +66,12 @@ Any Project Code that isn't in this table at all gets written in as
 This was built fast, as an MVP, and tested thoroughly - but a few
 deliberate shortcuts are worth knowing about:
 
-- **Only the first pay period on each employee's tab uses the template's
-  original design fully** (rows 10-23, including its live formulas). Every
-  pay period after that is a freshly-built block appended below, styled to
-  match closely, but it's a close visual match rather than a pixel-perfect
-  clone of every original border/shading detail.
+- **Every employee + pay-period combination gets its own tab**, always a
+  fresh clone of the template's original design (rows 10-23, including its
+  live formulas) - there's no appended/approximated second block anymore.
+  Tabs are named like `Lastname, First 7-13` (employee name + the pay
+  period's start date), truncated to fit Excel's 31-character sheet name
+  limit if needed.
 - **Only 4 BCWDB fund columns and 3 Non-BCWDB fund columns exist per pay
   period** (that's what the template has room for). If an employee
   genuinely worked more than 4 distinct BCWDB funds in one 2-week period,
@@ -77,13 +83,25 @@ deliberate shortcuts are worth knowing about:
   buckets everything into 14-day windows from there. If your actual pay
   period calendar doesn't start on that Monday, this is the place to fix
   it: `lib/payPeriods.js`.
-- **Matching a report row to an employee's tab is by Employee ID**, stored
-  in a small marker cell (`A1`) on each tab that isn't part of the visible
+- **Matching a report row to an employee is by Employee ID**, normalized by
+  stripping leading zeros (so `0000971` and `971` are treated as the same
+  person - some report exports zero-pad IDs and some don't) and stored in a
+  small marker cell (`A1`) on each tab that isn't part of the visible
   template. Don't delete or overwrite that cell, or the app won't recognize
-  that tab on the next run.
-- **Holiday hours are never populated from the report** - the sample data
-  only ever showed `REG SALARY` rows, so Holiday stays blank for manual
-  entry. PTO *is* populated, since Project Code 525010 maps to it.
+  that tab's employee+period on the next run.
+- **Holiday hours come from the report's Pay Code column** - a row with pay
+  code `HOLIDAY` always lands in the Holiday column, regardless of what its
+  Project Code would normally map to. PTO is still populated separately,
+  since Project Code 525010 maps to it.
+- **The MANAGER field is filled in with whichever approver shows up most
+  often** for that employee in that pay period (from the report's Approver
+  column), with a trailing `(Terminated)` stripped off. Blank approvers and
+  "Automatically Approved" don't count - if nothing else qualifies, the
+  field is left blank for manual entry.
+- **You get a review step before anything is written.** After the report is
+  parsed, the app lists every employee it found (name, ID, total hours)
+  with a checkbox so you can exclude anyone who shouldn't get a tab this
+  run - selections aren't saved between runs.
 
 None of these are hidden - the app surfaces a "Please review" list after
 every run with anything that needs a second look.
