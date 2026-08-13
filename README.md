@@ -2,8 +2,8 @@
 
 Drop in a check report (PDF or Excel) and your ongoing Contractor Timesheet
 workbook, and this tool merges the report's hours straight into the right
-tabs, days, and fund columns - matched by Employee ID, one tab per person,
-with every pay period stacked onto that same tab.
+tabs, days, and fund columns - matched by Employee ID, one tab per employee
+per pay period.
 
 Everything runs **in your browser** - no backend, no login, nothing ever
 uploaded anywhere. That's on purpose, and it's the same approach the
@@ -21,13 +21,13 @@ OSY/ISY Case Router this project is based on uses.
    Project Code maps to (see below).
 3. You get a review list of every employee found (name, ID, total hours) so
    you can uncheck anyone who shouldn't be included this run, then confirm.
-4. For each included employee, it finds (or creates) their one tab, and
-   writes each of their pay periods as its own block on it - reusing the
-   *exact* template formatting, colors, and dropdown lists, not a re-built
-   approximation - and fills in the manager field with their most frequent
-   approver for that first period.
-5. You get a single workbook back, with one tab per employee, ready to save
-   as your new "ongoing" file for next time.
+4. For each included employee and pay period, it creates a fresh tab and
+   writes their hours into the right day/fund cells - reusing the *exact*
+   template formatting, colors, dropdown lists, and signature lines, not a
+   re-built approximation - and fills in the manager field with their most
+   frequent approver for that period.
+5. You get a single workbook back, with one tab per employee per pay
+   period, ready to save as your new "ongoing" file for next time.
 
 Run it again next pay period with the workbook you just downloaded as the
 "ongoing" file, and it picks up right where it left off - it won't
@@ -66,18 +66,22 @@ Any Project Code that isn't in this table at all gets written in as
 This was built fast, as an MVP, and tested thoroughly - but a few
 deliberate shortcuts are worth knowing about:
 
-- **Only the first pay period on each employee's tab uses the template's
-  original design fully** (rows 10-23, including its live formulas). Every
-  pay period after that is a freshly-built block appended below, styled to
-  match closely, but it's a close visual match rather than a pixel-perfect
-  clone of every original border/shading detail. Where that next block
-  starts is always computed dynamically - one row past whatever the highest
-  row number already on the tab is - specifically so it can never land on
-  top of the template's own EMPLOYEE SIGNATURE / MANAGER SIGNATURE lines
-  (rows 28-29 and 34-35) or an earlier appended block. (An earlier version
-  of this app used a fixed offset there, which is what caused the
-  "cutting off hours" bug on multi-period tabs - two rows sharing the same
-  row number, with one silently winning.)
+- **Every employee + pay-period combination gets its own tab**, always a
+  full, untouched clone of the template - header, all 10 day-rows with
+  their original formulas, the totals/percentages row, and its own
+  EMPLOYEE SIGNATURE / MANAGER SIGNATURE lines. Nothing is stacked or
+  appended into an existing tab, so there's no way for one period's data to
+  collide with another's. Tabs are named `Lastname, First` for an
+  employee's first/earliest pay period in the workbook (so anything already
+  referencing that plain name keeps resolving to real data), and
+  `Lastname, First (M-D)` - using the pay period's start date - for every
+  period after that, truncating the name (never the date suffix) to fit
+  Excel's 31-character sheet name limit if needed. (An earlier version of
+  this app stacked every period after the first into the same tab as an
+  appended block, positioned dynamically to avoid the template's own
+  signature lines below row 23 - that approach worked but meant only the
+  first period got real signature lines. This one-tab-per-period design
+  sidesteps that entirely, since every tab is a full template clone.)
 - **Only 4 BCWDB fund columns and 3 Non-BCWDB fund columns exist per pay
   period** (that's what the template has room for). If an employee
   genuinely worked more than 4 distinct BCWDB funds in one 2-week period,
@@ -89,20 +93,22 @@ deliberate shortcuts are worth knowing about:
   buckets everything into 14-day windows from there. If your actual pay
   period calendar doesn't start on that Monday, this is the place to fix
   it: `lib/payPeriods.js`.
-- **Matching a report row to an employee's tab is by Employee ID**,
-  normalized by stripping leading zeros (so `0000971` and `971` are treated
-  as the same person - some report exports zero-pad IDs and some don't) and
-  stored in a small marker cell (`A1`) on each tab that isn't part of the
-  visible template. Don't delete or overwrite that cell, or the app won't
-  recognize that tab on the next run. If a row's Name field has an Employee
-  ID glued onto the front of it (e.g. `"1125662   Wilson, Amanda"` instead
-  of separate ID/Name columns - seen once in a real report export), the
-  parser strips it back down to a clean name and flags the row for review,
-  rather than letting the garbled name create a phantom duplicate tab.
+- **Matching a report row to an employee is by Employee ID**, normalized by
+  stripping leading zeros (so `0000971` and `971` are treated as the same
+  person - some report exports zero-pad IDs and some don't) and stored in a
+  small marker cell (`A1`, plus which pay period in `A2`) on each tab that
+  isn't part of the visible template. Don't delete or overwrite those
+  cells, or the app won't recognize that tab on the next run. If a row's
+  Name field has an Employee ID glued onto the front of it (e.g.
+  `"1125662   Wilson, Amanda"` instead of separate ID/Name columns - seen
+  once in a real report export), the parser strips it back down to a clean
+  name and flags the row for review, rather than letting the garbled name
+  create a phantom duplicate tab.
 - **An "ongoing" workbook that still has tabs from before this A1 marker
   existed** (named just `"Lastname, First"`, no marker at all) is handled
-  specially: if a fresh merge is about to write a tab under that same name,
-  it replaces that legacy tab in place - clean template, fully written,
+  specially: if a fresh merge is about to write that employee's
+  first/earliest period - the one that would use the plain name - it
+  replaces that legacy tab in place - clean template, fully written,
   properly marker-tagged - rather than leaving the old broken tab behind
   next to a newly-created, differently-named one (which is what used to
   happen, and looked like a duplicated/cut-off timesheet). A same-name
@@ -113,12 +119,10 @@ deliberate shortcuts are worth knowing about:
   Project Code would normally map to. PTO is still populated separately,
   since Project Code 525010 maps to it.
 - **The MANAGER field is filled in with whichever approver shows up most
-  often** for that employee in their first pay period (from the report's
-  Approver column), with a trailing `(Terminated)` stripped off. Blank
-  approvers and "Automatically Approved" don't count - if nothing else
-  qualifies, the field is left blank for manual entry. It isn't re-derived
-  for later pay periods appended to the same tab, since the template only
-  has one MANAGER field per tab.
+  often** for that employee in that pay period (from the report's Approver
+  column), with a trailing `(Terminated)` stripped off. Blank approvers and
+  "Automatically Approved" don't count - if nothing else qualifies, the
+  field is left blank for manual entry.
 - **You get a review step before anything is written.** After the report is
   parsed, the app lists every employee it found (name, ID, total hours)
   with a checkbox so you can exclude anyone who shouldn't get a tab this

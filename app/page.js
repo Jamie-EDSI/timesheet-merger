@@ -187,9 +187,8 @@ export default function Home() {
           <p className="mt-2 max-w-2xl text-ink-soft">
             Drop in a check report (PDF or Excel) and your ongoing Contractor Timesheet workbook. This
             tool matches each employee by ID, sorts their hours into the right fund columns, and gives
-            you back an updated workbook - one tab per employee, with every pay period stacked onto
-            that same tab, ready to save. Everything runs in your browser; no file is ever uploaded
-            anywhere.
+            you back an updated workbook - one tab per employee per pay period, ready to save.
+            Everything runs in your browser; no file is ever uploaded anywhere.
           </p>
         </header>
 
