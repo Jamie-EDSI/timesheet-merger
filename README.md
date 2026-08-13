@@ -99,6 +99,15 @@ deliberate shortcuts are worth knowing about:
   of separate ID/Name columns - seen once in a real report export), the
   parser strips it back down to a clean name and flags the row for review,
   rather than letting the garbled name create a phantom duplicate tab.
+- **An "ongoing" workbook that still has tabs from before this A1 marker
+  existed** (named just `"Lastname, First"`, no marker at all) is handled
+  specially: if a fresh merge is about to write a tab under that same name,
+  it replaces that legacy tab in place - clean template, fully written,
+  properly marker-tagged - rather than leaving the old broken tab behind
+  next to a newly-created, differently-named one (which is what used to
+  happen, and looked like a duplicated/cut-off timesheet). A same-name
+  collision between two *different*, already-tracked employees still falls
+  back to an ID-suffixed tab name, same as always.
 - **Holiday hours come from the report's Pay Code column** - a row with pay
   code `HOLIDAY` always lands in the Holiday column, regardless of what its
   Project Code would normally map to. PTO is still populated separately,
