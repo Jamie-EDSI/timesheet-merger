@@ -187,8 +187,9 @@ export default function Home() {
           <p className="mt-2 max-w-2xl text-ink-soft">
             Drop in a check report (PDF or Excel) and your ongoing Contractor Timesheet workbook. This
             tool matches each employee by ID, sorts their hours into the right fund columns, and gives
-            you back an updated workbook - one tab per employee per pay period, ready to save.
-            Everything runs in your browser; no file is ever uploaded anywhere.
+            you back an updated workbook - one tab per employee, with every pay period stacked onto
+            that same tab, ready to save. Everything runs in your browser; no file is ever uploaded
+            anywhere.
           </p>
         </header>
 
@@ -211,7 +212,7 @@ export default function Home() {
           </div>
           <FileDropCard
             title="Drop your ongoing Contractor Timesheet workbook here"
-            hint="Leave this blank the very first time - the app will start a brand-new workbook from the blank template, one tab per employee per pay period."
+            hint="Leave this blank the very first time - the app will start a brand-new workbook from the blank template, one tab per employee."
             file={ongoingFile}
             accept=".xlsx"
             onFile={setOngoingFile}
