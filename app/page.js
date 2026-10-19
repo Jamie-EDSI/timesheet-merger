@@ -86,6 +86,8 @@ export default function Home() {
   const [preMergeWarnings, setPreMergeWarnings] = useState([]); // parse + group warnings
   const [warnings, setWarnings] = useState([]);
   const [summary, setSummary] = useState([]);
+  const [nonBcwdbMismatches, setNonBcwdbMismatches] = useState([]);
+  const [nonBcwdbNotes, setNonBcwdbNotes] = useState([]);
   const [periodsFound, setPeriodsFound] = useState([]);
   const [groupedEmployees, setGroupedEmployees] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -117,11 +119,15 @@ export default function Home() {
     setErrorMsg("");
     setWarnings([]);
     setSummary([]);
+    setNonBcwdbMismatches([]);
+    setNonBcwdbNotes([]);
     setDownloadUrl(null);
 
     try {
-      const { entries, warnings: parseWarnings } = await parseReportFile(reportFile);
-      const { groupedEmployees: grouped, warnings: groupWarnings, periods } = groupEntries(entries);
+      const { entries, warnings: parseWarnings, reportedTotals } = await parseReportFile(reportFile);
+      const { groupedEmployees: grouped, warnings: groupWarnings, periods } = groupEntries(entries, {
+        reportedTotals,
+      });
       setPeriodsFound(periods);
       setPreMergeWarnings([...parseWarnings, ...groupWarnings]);
 
@@ -147,6 +153,8 @@ export default function Home() {
     setErrorMsg("");
     setWarnings([]);
     setSummary([]);
+    setNonBcwdbMismatches([]);
+    setNonBcwdbNotes([]);
     setDownloadUrl(null);
 
     try {
@@ -157,14 +165,23 @@ export default function Home() {
       );
       const ongoingArrayBuffer = ongoingFile ? await ongoingFile.arrayBuffer() : null;
 
-      const { blob, warnings: buildWarnings, summary: buildSummary } = await buildMergedWorkbook({
+      const {
+        blob,
+        warnings: buildWarnings,
+        summary: buildSummary,
+        nonBcwdbMismatches: buildMismatches,
+        nonBcwdbNotes: buildNotes,
+      } = await buildMergedWorkbook({
         templateArrayBuffer,
         ongoingArrayBuffer,
         groupedEmployees: includedEmployees,
+        reportPeriods: periodsFound,
       });
 
       setWarnings([...preMergeWarnings, ...buildWarnings]);
       setSummary(buildSummary);
+      setNonBcwdbMismatches(buildMismatches);
+      setNonBcwdbNotes(buildNotes);
 
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
@@ -265,7 +282,7 @@ export default function Home() {
               </div>
             </div>
             <p className="mt-1 text-xs text-ink-soft">
-              Unchecked employees are excluded from the merge. Uncheck anyone who shouldn't get a tab
+              Unchecked employees are excluded from the merge. Uncheck anyone who shouldn&apos;t get a tab
               this run.
             </p>
             <table className="mt-4 w-full text-left text-sm">
@@ -340,6 +357,53 @@ export default function Home() {
                 ))}
               </tbody>
             </table>
+          </section>
+        )}
+
+        {nonBcwdbMismatches.length > 0 && (
+          <section className="mt-6 rounded-xl border-2 border-yellow-400 bg-yellow-50 p-6 shadow-sm">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              Non-BCWDB hours don&apos;t match the report
+            </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              These employees&apos; Hours Worked Non-BCWDB were filled in as 8 minus their Berks hours
+              each weekday, but the total doesn&apos;t match their report &quot;Total Hours&quot; minus
+              their Berks hours. The values were still written - please check these tabs by hand.
+            </p>
+            <table className="mt-4 w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-yellow-400/60 text-ink-soft">
+                  <th className="pb-2 pr-4 font-medium">Employee</th>
+                  <th className="pb-2 pr-4 font-medium">ID</th>
+                  <th className="pb-2 pr-4 font-medium">Expected hours</th>
+                  <th className="pb-2 font-medium">Actual hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nonBcwdbMismatches.map((m) => (
+                  <tr key={m.employeeId} className="border-b border-yellow-400/30">
+                    <td className="py-2 pr-4">{m.employeeName}</td>
+                    <td className="py-2 pr-4 font-mono text-ink-soft">{m.employeeId}</td>
+                    <td className="py-2 pr-4">{m.expectedHours}</td>
+                    <td className="py-2">{m.actualHours}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {nonBcwdbNotes.length > 0 && (
+          <section className="mt-6 rounded-xl border border-line bg-gray-50 p-6 shadow-sm">
+            <h2 className="font-display text-lg font-semibold text-ink">For your information</h2>
+            <ul className="mt-3 space-y-2 text-sm text-ink-soft">
+              {nonBcwdbNotes.map((note, i) => (
+                <li key={i} className="flex gap-2">
+                  <span aria-hidden>•</span>
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
