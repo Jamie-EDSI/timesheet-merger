@@ -365,31 +365,18 @@ export default function Home() {
             <h2 className="font-display text-lg font-semibold text-ink">
               Non-BCWDB hours don&apos;t match the report
             </h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              These employees&apos; Hours Worked Non-BCWDB were filled in as 8 minus their Berks hours
-              each weekday, but the total doesn&apos;t match their report &quot;Total Hours&quot; minus
-              their Berks hours. The values were still written - please check these tabs by hand.
-            </p>
-            <table className="mt-4 w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-yellow-400/60 text-ink-soft">
-                  <th className="pb-2 pr-4 font-medium">Employee</th>
-                  <th className="pb-2 pr-4 font-medium">ID</th>
-                  <th className="pb-2 pr-4 font-medium">Expected hours</th>
-                  <th className="pb-2 font-medium">Actual hours</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nonBcwdbMismatches.map((m) => (
-                  <tr key={m.employeeId} className="border-b border-yellow-400/30">
-                    <td className="py-2 pr-4">{m.employeeName}</td>
-                    <td className="py-2 pr-4 font-mono text-ink-soft">{m.employeeId}</td>
-                    <td className="py-2 pr-4">{m.expectedHours}</td>
-                    <td className="py-2">{m.actualHours}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ul className="mt-3 space-y-2 text-sm text-ink">
+              {nonBcwdbMismatches.map((m) => (
+                <li key={m.employeeId} className="flex gap-2">
+                  <span aria-hidden>•</span>
+                  <span>
+                    {m.employeeName}: report says {m.expectedHours} non-Berks hours across the report
+                    range, but a daily fill gives {m.actualHours}. Column K was left blank. Enter these
+                    hours manually.
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
